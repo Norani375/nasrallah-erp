@@ -1,11 +1,12 @@
-import { useState } from 'react';
-import { Search, Plus, Save, X, Pencil, DollarSign } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, Plus, Save, X, Pencil, DollarSign, Loader2 } from 'lucide-react';
 import { getHardware, updateHardwareItem, addHardwareItem } from '../utils/db';
 import { formatNumber, formatCurrency } from '../utils/helpers';
+import { HardwareItem } from '../types';
 
 export const Hardware: React.FC = () => {
-  const [, setTick] = useState(0);
-  const refresh = () => setTick(t => t + 1);
+  const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState<HardwareItem[]>([]);
   const [search, setSearch] = useState('');
   const [editId, setEditId] = useState<number | null>(null);
   const [editField, setEditField] = useState('');
@@ -13,22 +14,30 @@ export const Hardware: React.FC = () => {
   const [showAdd, setShowAdd] = useState(false);
   const [newItem, setNewItem] = useState({ name: '', unit: 'دانه', quantity: 0, price: 0 });
 
-  const items = getHardware();
+  async function loadData() {
+    setLoading(true);
+    try { setItems(await getHardware()); } catch (e) { console.error(e); }
+    setLoading(false);
+  }
 
-  function handleSaveEdit() {
+  useEffect(() => { loadData(); }, []);
+
+  async function handleSaveEdit() {
     if (editId !== null) {
-      updateHardwareItem(editId, editField, parseFloat(editValue) || 0);
+      await updateHardwareItem(editId, editField, parseFloat(editValue) || 0);
       setEditId(null);
-      refresh();
+      loadData();
     }
   }
 
-  function handleAdd() {
-    addHardwareItem(newItem.name, newItem.unit, newItem.quantity, newItem.price);
+  async function handleAdd() {
+    await addHardwareItem(newItem.name, newItem.unit, newItem.quantity, newItem.price);
     setShowAdd(false);
     setNewItem({ name: '', unit: 'دانه', quantity: 0, price: 0 });
-    refresh();
+    loadData();
   }
+
+  if (loading) return <div className="flex justify-center py-12"><Loader2 className="animate-spin text-primary" size={32} /></div>;
 
   const filtered = items.filter(i => i.name.includes(search));
   const totalValue = items.reduce((s, i) => s + (i.quantity || 0) * (i.price_per_unit || 0), 0);

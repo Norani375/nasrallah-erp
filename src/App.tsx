@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Menu, RefreshCw } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Menu, RefreshCw, Loader2 } from 'lucide-react';
 import { Page } from './types';
 import { initDatabase } from './utils/db';
 import { Login } from './components/Login';
@@ -10,9 +10,6 @@ import { Products } from './components/Products';
 import { Hardware } from './components/Hardware';
 import { Production } from './components/Production';
 import { Sales } from './components/Sales';
-
-// Initialize database on load
-initDatabase();
 
 const pageLabels: Record<Page, string> = {
   'dashboard': 'داشبورد',
@@ -28,9 +25,42 @@ function App() {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [dbReady, setDbReady] = useState(false);
+  const [dbError, setDbError] = useState('');
+
+  useEffect(() => {
+    if (loggedIn) {
+      initDatabase()
+        .then(() => setDbReady(true))
+        .catch((err) => setDbError(err.message || 'خطا در اتصال به دیتابیس'));
+    }
+  }, [loggedIn]);
 
   if (!loggedIn) {
     return <Login onLogin={() => setLoggedIn(true)} />;
+  }
+
+  if (dbError) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-base-100">
+        <div className="card bg-error/10 border border-error/30 p-8 text-center max-w-md">
+          <p className="text-error font-bold mb-2">خطا در اتصال به دیتابیس</p>
+          <p className="text-sm text-base-content/70 mb-4">{dbError}</p>
+          <button className="btn btn-primary btn-sm" onClick={() => window.location.reload()}>تلاش مجدد</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!dbReady) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-base-100">
+        <div className="text-center">
+          <Loader2 className="animate-spin mx-auto mb-3 text-primary" size={40} />
+          <p className="text-base-content/60">در حال اتصال به دیتابیس...</p>
+        </div>
+      </div>
+    );
   }
 
   function handleLogout() {

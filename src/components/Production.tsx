@@ -1,48 +1,63 @@
-import { useState } from 'react';
-import { Factory, Plus, Trash2, Play, AlertCircle, CheckCircle } from 'lucide-react';
-import { RawMaterial } from '../types';
+import { useState, useEffect } from 'react';
+import { Factory, Plus, Trash2, Play, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import { RawMaterial, Product, HardwareItem, ProductionFormula } from '../types';
 import { getProducts, getRawMaterials, getHardware, getFormulas, addProductionFormula, deleteFormula, produceProduct } from '../utils/db';
 import { formatNumber } from '../utils/helpers';
 
 export const Production: React.FC = () => {
-  const [, setTick] = useState(0);
-  const refresh = () => setTick(t => t + 1);
+  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
+  const [hardware, setHardware] = useState<HardwareItem[]>([]);
+  const [formulas, setFormulas] = useState<ProductionFormula[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<number | null>(null);
   const [produceQty, setProduceQty] = useState(1);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [newFormula, setNewFormula] = useState({ materialType: 'raw' as 'raw' | 'hardware', materialId: 0, quantity: 0 });
 
-  const products = getProducts();
-  const rawMaterials = getRawMaterials();
-  const hardware = getHardware();
-  const formulas = selectedProduct ? getFormulas(selectedProduct) : [];
+  async function loadData() {
+    setLoading(true);
+    try {
+      const [pr, rm, hw] = await Promise.all([getProducts(), getRawMaterials(), getHardware()]);
+      setProducts(pr); setRawMaterials(rm); setHardware(hw);
+    } catch (e) { console.error(e); }
+    setLoading(false);
+  }
+
+  async function loadFormulas(productId: number) {
+    try { setFormulas(await getFormulas(productId)); } catch (e) { console.error(e); }
+  }
+
+  useEffect(() => { loadData(); }, []);
+  useEffect(() => { if (selectedProduct) loadFormulas(selectedProduct); else setFormulas([]); }, [selectedProduct]);
 
   function handleSelectProduct(id: number) {
     setSelectedProduct(id);
     setMessage(null);
   }
 
-  function handleAddFormula() {
+  async function handleAddFormula() {
     if (!selectedProduct || newFormula.materialId === 0 || newFormula.quantity <= 0) return;
-    addProductionFormula(selectedProduct, newFormula.materialType, newFormula.materialId, newFormula.quantity);
+    await addProductionFormula(selectedProduct, newFormula.materialType, newFormula.materialId, newFormula.quantity);
     setNewFormula({ materialType: 'raw', materialId: 0, quantity: 0 });
-    refresh();
+    loadFormulas(selectedProduct);
   }
 
-  function handleDeleteFormula(id: number) {
-    deleteFormula(id);
-    refresh();
+  async function handleDeleteFormula(id: number) {
+    await deleteFormula(id);
+    if (selectedProduct) loadFormulas(selectedProduct);
   }
 
-  function handleProduce() {
+  async function handleProduce() {
     if (!selectedProduct || produceQty <= 0) return;
-    const result = produceProduct(selectedProduct, produceQty);
+    const result = await produceProduct(selectedProduct, produceQty);
     if (result.success) {
       setMessage({ type: 'success', text: `${produceQty} عدد با موفقیت تولید شد!` });
     } else {
       setMessage({ type: 'error', text: result.error || 'خطا در تولید' });
     }
-    refresh();
+    loadData();
+    loadFormulas(selectedProduct);
   }
 
   function getMaterialName(type: string, id: number): string {
@@ -55,13 +70,11 @@ export const Production: React.FC = () => {
   }
 
   function getMaterialUnit(type: string, id: number): string {
-    if (type === 'raw') {
-      const m = rawMaterials.find(r => r.id === id);
-      return m?.unit || '';
-    }
-    const h = hardware.find(hw => hw.id === id);
-    return h?.unit || '';
+    if (type === 'raw') { const m = rawMaterials.find(r => r.id === id); return m?.unit || ''; }
+    const h = hardware.find(hw => hw.id === id); return h?.unit || '';
   }
+
+  if (loading) return <div className="flex justify-center py-12"><Loader2 className="animate-spin text-primary" size={32} /></div>;
 
   const currentMaterialList = newFormula.materialType === 'raw' ? rawMaterials : hardware;
   const selectedProductData = products.find(p => p.id === selectedProduct);

@@ -1,22 +1,36 @@
-import { useState } from 'react';
-import { TrendingUp, TrendingDown, AlertTriangle, DollarSign, Boxes, ShoppingCart, Lock, Plus, Check, RefreshCw } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { TrendingUp, TrendingDown, AlertTriangle, DollarSign, Boxes, ShoppingCart, Lock, Plus, Check, RefreshCw, Loader2 } from 'lucide-react';
 import { getRawMaterials, getProducts, getHardware, getSales, getCapitalSettings, freezeCapital, getCapitalAdjustments, addCapitalAdjustment, mergeAdjustmentToCapital } from '../utils/db';
 import { formatCurrency, formatNumber } from '../utils/helpers';
+import { RawMaterial, Product, HardwareItem, Sale, CapitalSetting, CapitalAdjustment } from '../types';
 
 export const Dashboard: React.FC = () => {
-  const [, setTick] = useState(0);
-  const refresh = () => setTick(t => t + 1);
+  const [loading, setLoading] = useState(true);
+  const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [hardware, setHardware] = useState<HardwareItem[]>([]);
+  const [sales, setSales] = useState<Sale[]>([]);
+  const [capitalSetting, setCapitalSetting] = useState<CapitalSetting | null>(null);
+  const [adjustments, setAdjustments] = useState<CapitalAdjustment[]>([]);
   const [showAdjForm, setShowAdjForm] = useState(false);
   const [adjAmount, setAdjAmount] = useState('');
   const [adjType, setAdjType] = useState<'profit' | 'loss'>('profit');
   const [adjDesc, setAdjDesc] = useState('');
 
-  const rawMaterials = getRawMaterials();
-  const products = getProducts();
-  const hardware = getHardware();
-  const sales = getSales();
-  const capitalSetting = getCapitalSettings();
-  const adjustments = getCapitalAdjustments();
+  async function loadData() {
+    setLoading(true);
+    try {
+      const [rm, pr, hw, sl, cap, adj] = await Promise.all([
+        getRawMaterials(), getProducts(), getHardware(), getSales(), getCapitalSettings(), getCapitalAdjustments()
+      ]);
+      setRawMaterials(rm); setProducts(pr); setHardware(hw); setSales(sl); setCapitalSetting(cap); setAdjustments(adj);
+    } catch (e) { console.error(e); }
+    setLoading(false);
+  }
+
+  useEffect(() => { loadData(); }, []);
+
+  if (loading) return <div className="flex justify-center py-12"><Loader2 className="animate-spin text-primary" size={32} /></div>;
 
   const rmCapital = rawMaterials.reduce((s, r) => s + (r.quantity || 0) * (r.price_per_unit || 0), 0);
   const prCapital = products.reduce((s, p) => s + (p.quantity || 0) * (p.price || 0), 0);
@@ -26,29 +40,28 @@ export const Dashboard: React.FC = () => {
   const noPriceProducts = products.filter((p) => !p.price);
   const lowStockRaw = rawMaterials.filter((r) => r.quantity <= 5);
   const lowStockHw = hardware.filter((h) => h.quantity <= 10);
-
   const initialCapital = capitalSetting?.initial_capital || 0;
   const totalAdjustments = adjustments.reduce((s, a) => s + (a.amount || 0), 0);
   const netChange = currentValue - initialCapital + totalSales;
 
-  function handleFreeze() {
-    freezeCapital(currentValue, 'فریز اولیه');
-    refresh();
+  async function handleFreeze() {
+    await freezeCapital(currentValue, 'فریز اولیه');
+    loadData();
   }
 
-  function handleAddAdj() {
+  async function handleAddAdj() {
     const amt = parseFloat(adjAmount);
     if (!amt || amt <= 0) return;
     const finalAmt = adjType === 'loss' ? -amt : amt;
-    addCapitalAdjustment(finalAmt, adjType, adjDesc || (adjType === 'profit' ? 'سود' : 'زیان'));
+    await addCapitalAdjustment(finalAmt, adjType, adjDesc || (adjType === 'profit' ? 'سود' : 'زیان'));
     setAdjAmount(''); setAdjDesc(''); setShowAdjForm(false);
-    refresh();
+    loadData();
   }
 
-  function handleMerge(adjId: number) {
+  async function handleMerge(adjId: number) {
     if (!confirm('آیا مطمئنید که می‌خواهید این مبلغ را به سرمایه اولیه اضافه کنید؟')) return;
-    mergeAdjustmentToCapital(adjId);
-    refresh();
+    await mergeAdjustmentToCapital(adjId);
+    loadData();
   }
 
   return (

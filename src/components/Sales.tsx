@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { ShoppingCart, Plus, Trash2, FileText, Eye, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ShoppingCart, Plus, Trash2, FileText, Eye, X, Loader2 } from 'lucide-react';
 import { getProducts, getSales, getSaleItems, createSale } from '../utils/db';
 import { formatNumber, formatCurrency } from '../utils/helpers';
+import { Product, Sale, SaleItem } from '../types';
 
 interface CartItem {
   product_id: number;
@@ -12,17 +13,34 @@ interface CartItem {
 }
 
 export const Sales: React.FC = () => {
-  const [, setTick] = useState(0);
-  const refresh = () => setTick(t => t + 1);
+  const [loading, setLoading] = useState(true);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [sales, setSales] = useState<Sale[]>([]);
   const [customerName, setCustomerName] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedProductId, setSelectedProductId] = useState(0);
   const [viewSaleId, setViewSaleId] = useState<number | null>(null);
+  const [viewItems, setViewItems] = useState<SaleItem[]>([]);
   const [showNewSale, setShowNewSale] = useState(false);
 
-  const products = getProducts();
-  const sales = getSales();
-  const viewItems = viewSaleId ? getSaleItems(viewSaleId) : [];
+  async function loadData() {
+    setLoading(true);
+    try {
+      const [pr, sl] = await Promise.all([getProducts(), getSales()]);
+      setProducts(pr); setSales(sl);
+    } catch (e) { console.error(e); }
+    setLoading(false);
+  }
+
+  useEffect(() => { loadData(); }, []);
+
+  useEffect(() => {
+    if (viewSaleId) {
+      getSaleItems(viewSaleId).then(setViewItems).catch(console.error);
+    } else {
+      setViewItems([]);
+    }
+  }, [viewSaleId]);
 
   function addToCart() {
     if (selectedProductId === 0) return;
@@ -47,14 +65,16 @@ export const Sales: React.FC = () => {
     setCart(prev => prev.filter(c => c.product_id !== productId));
   }
 
-  function handleSubmitSale() {
+  async function handleSubmitSale() {
     if (!customerName.trim() || cart.length === 0) return;
-    createSale(customerName, cart);
+    await createSale(customerName, cart);
     setCustomerName('');
     setCart([]);
     setShowNewSale(false);
-    refresh();
+    loadData();
   }
+
+  if (loading) return <div className="flex justify-center py-12"><Loader2 className="animate-spin text-primary" size={32} /></div>;
 
   const cartTotal = cart.reduce((s, c) => s + c.quantity * c.unit_price, 0);
   const availableProducts = products.filter(p => p.quantity > 0 && p.price && !cart.find(c => c.product_id === p.id));
@@ -63,7 +83,7 @@ export const Sales: React.FC = () => {
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         <button className="btn btn-primary btn-sm" onClick={() => setShowNewSale(!showNewSale)}><Plus size={16} /> فاکتور جدید</button>
-        <div className="badge badge-primary badge-lg">مجموع فروش: {formatCurrency(sales.reduce((s, sl) => s + sl.total_amount, 0))}</div>
+        <div className="badge badge-primary badge-lg">مجموع فروش: {formatCurrency(sales.reduce((s, sl) => s + (sl.total_amount || 0), 0))}</div>
       </div>
 
       {showNewSale && (

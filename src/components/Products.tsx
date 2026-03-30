@@ -1,11 +1,12 @@
-import { useState } from 'react';
-import { Search, Plus, Save, X, Pencil, DollarSign } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, Plus, Save, X, Pencil, DollarSign, Loader2 } from 'lucide-react';
 import { getProducts, updateProduct, addProduct } from '../utils/db';
 import { formatNumber, formatCurrency } from '../utils/helpers';
+import { Product } from '../types';
 
 export const Products: React.FC = () => {
-  const [, setTick] = useState(0);
-  const refresh = () => setTick(t => t + 1);
+  const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState('all');
   const [editId, setEditId] = useState<number | null>(null);
@@ -14,22 +15,30 @@ export const Products: React.FC = () => {
   const [showAdd, setShowAdd] = useState(false);
   const [newItem, setNewItem] = useState({ name: '', category: 'الماری', quantity: 0, price: 0 });
 
-  const items = getProducts();
+  async function loadData() {
+    setLoading(true);
+    try { setItems(await getProducts()); } catch (e) { console.error(e); }
+    setLoading(false);
+  }
 
-  function handleSaveEdit() {
+  useEffect(() => { loadData(); }, []);
+
+  async function handleSaveEdit() {
     if (editId !== null) {
-      updateProduct(editId, editField, parseFloat(editValue) || 0);
+      await updateProduct(editId, editField, parseFloat(editValue) || 0);
       setEditId(null);
-      refresh();
+      loadData();
     }
   }
 
-  function handleAdd() {
-    addProduct(newItem.name, newItem.category, newItem.quantity, newItem.price);
+  async function handleAdd() {
+    await addProduct(newItem.name, newItem.category, newItem.quantity, newItem.price);
     setShowAdd(false);
     setNewItem({ name: '', category: 'الماری', quantity: 0, price: 0 });
-    refresh();
+    loadData();
   }
+
+  if (loading) return <div className="flex justify-center py-12"><Loader2 className="animate-spin text-primary" size={32} /></div>;
 
   const categories = ['all', ...Array.from(new Set(items.map(i => i.category)))];
   const filtered = items.filter(i => {

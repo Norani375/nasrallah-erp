@@ -1,11 +1,12 @@
-import { useState } from 'react';
-import { Search, Plus, Save, X, Pencil, DollarSign } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Search, Plus, Save, X, Pencil, DollarSign, Loader2 } from 'lucide-react';
 import { getRawMaterials, updateRawMaterial, addRawMaterial } from '../utils/db';
 import { formatNumber, formatCurrency } from '../utils/helpers';
+import { RawMaterial } from '../types';
 
 export const RawMaterials: React.FC = () => {
-  const [, setTick] = useState(0);
-  const refresh = () => setTick(t => t + 1);
+  const [loading, setLoading] = useState(true);
+  const [items, setItems] = useState<RawMaterial[]>([]);
   const [search, setSearch] = useState('');
   const [editId, setEditId] = useState<number | null>(null);
   const [editField, setEditField] = useState('');
@@ -13,22 +14,30 @@ export const RawMaterials: React.FC = () => {
   const [showAdd, setShowAdd] = useState(false);
   const [newItem, setNewItem] = useState({ name: '', dimensions: '', unit: 'دانه', quantity: 0, price: 0 });
 
-  const items = getRawMaterials();
+  async function loadData() {
+    setLoading(true);
+    try { setItems(await getRawMaterials()); } catch (e) { console.error(e); }
+    setLoading(false);
+  }
 
-  function handleSaveEdit() {
+  useEffect(() => { loadData(); }, []);
+
+  async function handleSaveEdit() {
     if (editId !== null) {
-      updateRawMaterial(editId, editField, parseFloat(editValue) || 0);
+      await updateRawMaterial(editId, editField, parseFloat(editValue) || 0);
       setEditId(null);
-      refresh();
+      loadData();
     }
   }
 
-  function handleAdd() {
-    addRawMaterial(newItem.name, newItem.dimensions, newItem.unit, newItem.quantity, newItem.price);
+  async function handleAdd() {
+    await addRawMaterial(newItem.name, newItem.dimensions, newItem.unit, newItem.quantity, newItem.price);
     setShowAdd(false);
     setNewItem({ name: '', dimensions: '', unit: 'دانه', quantity: 0, price: 0 });
-    refresh();
+    loadData();
   }
+
+  if (loading) return <div className="flex justify-center py-12"><Loader2 className="animate-spin text-primary" size={32} /></div>;
 
   const filtered = items.filter(i => i.name.includes(search) || (i.dimensions || '').includes(search));
   const totalValue = items.reduce((s, i) => s + (i.quantity || 0) * (i.price_per_unit || 0), 0);
