@@ -1,52 +1,66 @@
-import { useState, useEffect } from 'react';
-import { Search, Plus, Save, X, Pencil, DollarSign, Loader2 } from 'lucide-react';
-import { getProducts, updateProduct, addProduct } from '../utils/db';
-import { formatNumber, formatCurrency } from '../utils/helpers';
+import React, { useEffect, useState } from 'react';
+import { Search, Plus, Save, X, Pencil, Trash2 } from 'lucide-react';
 import { Product } from '../types';
+import { getProducts, addProduct, deleteProduct, editProduct } from '../utils/db';
+import { formatNumber, formatCurrency } from '../utils/helpers';
 
 export const Products: React.FC = () => {
-  const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState('all');
-  const [editId, setEditId] = useState<number | null>(null);
-  const [editField, setEditField] = useState('');
-  const [editValue, setEditValue] = useState('');
+  const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [newItem, setNewItem] = useState({ name: '', category: 'الماری', quantity: 0, price: 0 });
-
-  async function loadData() {
-    setLoading(true);
-    try { setItems(await getProducts()); } catch (e) { console.error(e); }
-    setLoading(false);
-  }
+  const [editId, setEditId] = useState<number | null>(null);
+  const [editData, setEditData] = useState({ name: '', category: '', quantity: 0, price: 0 });
+  const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
 
   useEffect(() => { loadData(); }, []);
 
-  async function handleSaveEdit() {
-    if (editId !== null) {
-      await updateProduct(editId, editField, parseFloat(editValue) || 0);
-      setEditId(null);
-      loadData();
-    }
+  async function loadData() {
+    setLoading(true);
+    const data = await getProducts();
+    setItems(data);
+    setLoading(false);
   }
 
   async function handleAdd() {
+    if (!newItem.name) return;
     await addProduct(newItem.name, newItem.category, newItem.quantity, newItem.price);
     setShowAdd(false);
     setNewItem({ name: '', category: 'الماری', quantity: 0, price: 0 });
     loadData();
   }
 
-  if (loading) return <div className="flex justify-center py-12"><Loader2 className="animate-spin text-primary" size={32} /></div>;
+  function startEdit(item: Product) {
+    setEditId(item.id);
+    setEditData({ name: item.name, category: item.category, quantity: item.quantity || 0, price: item.price || 0 });
+  }
 
-  const categories = ['all', ...Array.from(new Set(items.map(i => i.category)))];
-  const filtered = items.filter(i => {
+  async function handleSaveEdit() {
+    if (editId === null) return;
+    await editProduct(editId, editData.name, editData.category, editData.quantity, editData.price);
+    setEditId(null);
+    loadData();
+  }
+
+  async function handleDelete(id: number) {
+    await deleteProduct(id);
+    setDeleteConfirm(null);
+    loadData();
+  }
+
+  const categories = ['all', ...Array.from(new Set(items.map((i) => i.category)))];
+  const filtered = items.filter((i) => {
     const matchSearch = i.name.includes(search);
     const matchCat = filterCat === 'all' || i.category === filterCat;
     return matchSearch && matchCat;
   });
   const totalValue = items.reduce((s, i) => s + (i.quantity || 0) * (i.price || 0), 0);
+
+  if (loading) {
+    return <div className="flex items-center justify-center h-64"><span className="loading loading-spinner loading-lg text-primary" /></div>;
+  }
 
   return (
     <div className="space-y-4">
@@ -56,9 +70,11 @@ export const Products: React.FC = () => {
           <input type="search" className="grow" placeholder="جستجوی محصول..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </label>
         <select className="select select-bordered select-sm" value={filterCat} onChange={(e) => setFilterCat(e.target.value)}>
-          {categories.map(c => <option key={c} value={c}>{c === 'all' ? 'همه دسته‌ها' : c}</option>)}
+          {categories.map((c) => (<option key={c} value={c}>{c === 'all' ? 'همه دسته‌ها' : c}</option>))}
         </select>
-        <button className="btn btn-primary btn-sm" onClick={() => setShowAdd(true)}><Plus size={16} /> افزودن</button>
+        <button className="btn btn-primary btn-sm" onClick={() => setShowAdd(true)}>
+          <Plus size={16} /> افزودن
+        </button>
         <div className="badge badge-primary badge-lg">مجموع: {formatCurrency(totalValue)}</div>
       </div>
 
@@ -82,47 +98,58 @@ export const Products: React.FC = () => {
         </div>
       )}
 
+      {deleteConfirm !== null && (
+        <div className="alert alert-warning">
+          <span>آیا مطمئن هستید که می‌خواهید «{items.find(i => i.id === deleteConfirm)?.name}» را حذف کنید؟</span>
+          <div className="flex gap-2">
+            <button className="btn btn-error btn-sm" onClick={() => handleDelete(deleteConfirm)}>بله، حذف شود</button>
+            <button className="btn btn-ghost btn-sm" onClick={() => setDeleteConfirm(null)}>لغو</button>
+          </div>
+        </div>
+      )}
+
       <div className="overflow-x-auto">
         <table className="table table-zebra table-sm">
-          <thead><tr><th>#</th><th>نام محصول</th><th>دسته‌بندی</th><th>موجودی</th><th>قیمت</th><th>ارزش کل</th><th>عملیات</th></tr></thead>
+          <thead>
+            <tr><th>#</th><th>نام محصول</th><th>دسته‌بندی</th><th>موجودی</th><th>قیمت</th><th>ارزش کل</th><th>عملیات</th></tr>
+          </thead>
           <tbody>
             {filtered.map((item, idx) => (
-              <tr key={item.id}>
-                <td className="text-base-content/60">{idx + 1}</td>
-                <td className="font-medium">{item.name}</td>
-                <td><span className="badge badge-sm">{item.category}</span></td>
-                <td>
-                  {editId === item.id && editField === 'quantity' ? (
-                    <div className="flex items-center gap-1">
-                      <input type="number" className="input input-bordered input-xs w-20" value={editValue} onChange={(e) => setEditValue(e.target.value)} autoFocus onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit()} />
-                      <button className="btn btn-xs btn-primary" onClick={handleSaveEdit}><Save size={12} /></button>
-                      <button className="btn btn-xs btn-ghost" onClick={() => setEditId(null)}><X size={12} /></button>
+              editId === item.id ? (
+                <tr key={item.id} className="bg-base-200">
+                  <td>{idx + 1}</td>
+                  <td><input className="input input-bordered input-xs w-full" value={editData.name} onChange={(e) => setEditData({...editData, name: e.target.value})} /></td>
+                  <td>
+                    <select className="select select-bordered select-xs" value={editData.category} onChange={(e) => setEditData({...editData, category: e.target.value})}>
+                      <option>تخت خواب</option><option>میز آرایش</option><option>الماری</option>
+                    </select>
+                  </td>
+                  <td><input type="number" className="input input-bordered input-xs w-20" value={editData.quantity} onChange={(e) => setEditData({...editData, quantity: parseInt(e.target.value) || 0})} /></td>
+                  <td><input type="number" className="input input-bordered input-xs w-24" value={editData.price} onChange={(e) => setEditData({...editData, price: parseFloat(e.target.value) || 0})} /></td>
+                  <td>{formatCurrency(editData.quantity * editData.price)}</td>
+                  <td>
+                    <div className="flex gap-1">
+                      <button className="btn btn-primary btn-xs" onClick={handleSaveEdit}><Save size={12} /></button>
+                      <button className="btn btn-ghost btn-xs" onClick={() => setEditId(null)}><X size={12} /></button>
                     </div>
-                  ) : (
-                    <span className={!item.quantity ? 'text-error font-bold' : ''}>{formatNumber(item.quantity || 0)} {item.unit}</span>
-                  )}
-                </td>
-                <td>
-                  {editId === item.id && editField === 'price' ? (
-                    <div className="flex items-center gap-1">
-                      <input type="number" className="input input-bordered input-xs w-24" value={editValue} onChange={(e) => setEditValue(e.target.value)} autoFocus onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit()} />
-                      <button className="btn btn-xs btn-primary" onClick={handleSaveEdit}><Save size={12} /></button>
-                      <button className="btn btn-xs btn-ghost" onClick={() => setEditId(null)}><X size={12} /></button>
+                  </td>
+                </tr>
+              ) : (
+                <tr key={item.id}>
+                  <td className="text-base-content/60">{idx + 1}</td>
+                  <td className="font-medium">{item.name}</td>
+                  <td><span className="badge badge-sm">{item.category}</span></td>
+                  <td><span className={!item.quantity ? 'text-error font-bold' : ''}>{formatNumber(item.quantity || 0)} {item.unit}</span></td>
+                  <td><span className={!item.price ? 'text-error font-bold' : ''}>{!item.price ? '⚠️ نامشخص' : formatCurrency(item.price)}</span></td>
+                  <td>{!item.price ? <span className="text-error">—</span> : formatCurrency((item.quantity || 0) * (item.price || 0))}</td>
+                  <td>
+                    <div className="flex gap-1">
+                      <button className="btn btn-ghost btn-xs" title="ویرایش" onClick={() => startEdit(item)}><Pencil size={12} /></button>
+                      <button className="btn btn-ghost btn-xs text-error" title="حذف" onClick={() => setDeleteConfirm(item.id)}><Trash2 size={12} /></button>
                     </div>
-                  ) : (
-                    <span className={!item.price ? 'text-error font-bold' : ''}>
-                      {!item.price ? '⚠️ نامشخص' : formatCurrency(item.price)}
-                    </span>
-                  )}
-                </td>
-                <td>{!item.price ? <span className="text-error">—</span> : formatCurrency((item.quantity || 0) * (item.price || 0))}</td>
-                <td>
-                  <div className="flex gap-1">
-                    <button className="btn btn-ghost btn-xs" onClick={() => { setEditId(item.id); setEditField('quantity'); setEditValue(String(item.quantity)); }}><Pencil size={12} /></button>
-                    <button className="btn btn-ghost btn-xs" onClick={() => { setEditId(item.id); setEditField('price'); setEditValue(String(item.price || 0)); }}><DollarSign size={12} /></button>
-                  </div>
-                </td>
-              </tr>
+                  </td>
+                </tr>
+              )
             ))}
           </tbody>
         </table>

@@ -52,6 +52,31 @@ export async function addHardwareItem(name: string, unit: string, quantity: numb
   await apiCall('addHardwareItem', { name, unit, quantity, price });
 }
 
+// ===== Delete items =====
+export async function deleteRawMaterial(id: number): Promise<void> {
+  await apiCall('deleteRawMaterial', { id });
+}
+export async function deleteProduct(id: number): Promise<void> {
+  await apiCall('deleteProduct', { id });
+}
+export async function deleteHardwareItem(id: number): Promise<void> {
+  await apiCall('deleteHardwareItem', { id });
+}
+export async function deleteSale(id: number): Promise<void> {
+  await apiCall('deleteSale', { id });
+}
+
+// ===== Full edit items =====
+export async function editRawMaterial(id: number, name: string, dimensions: string, unit: string, quantity: number, price: number): Promise<void> {
+  await apiCall('editRawMaterial', { id, name, dimensions, unit, quantity, price });
+}
+export async function editProduct(id: number, name: string, category: string, quantity: number, price: number): Promise<void> {
+  await apiCall('editProduct', { id, name, category, quantity, price });
+}
+export async function editHardwareItem(id: number, name: string, unit: string, quantity: number, price: number): Promise<void> {
+  await apiCall('editHardwareItem', { id, name, unit, quantity, price });
+}
+
 // ===== Sales =====
 export async function getSales(): Promise<Sale[]> {
   return apiCall('getSales');

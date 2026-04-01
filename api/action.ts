@@ -164,6 +164,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.json({ success: true });
       }
 
+      // ===== DELETE ITEMS =====
+      case 'deleteRawMaterial': {
+        const { id } = params;
+        await sql`DELETE FROM raw_materials WHERE id=${id}`;
+        return res.json({ success: true });
+      }
+      case 'deleteProduct': {
+        const { id } = params;
+        await sql`DELETE FROM products WHERE id=${id}`;
+        return res.json({ success: true });
+      }
+      case 'deleteHardwareItem': {
+        const { id } = params;
+        await sql`DELETE FROM hardware WHERE id=${id}`;
+        return res.json({ success: true });
+      }
+      case 'deleteSale': {
+        const { id } = params;
+        await sql`DELETE FROM sale_items WHERE sale_id=${id}`;
+        await sql`DELETE FROM sales WHERE id=${id}`;
+        return res.json({ success: true });
+      }
+
+      // ===== FULL EDIT ITEMS =====
+      case 'editRawMaterial': {
+        const { id, name, dimensions, unit, quantity, price } = params;
+        await sql`UPDATE raw_materials SET name=${name},dimensions=${dimensions||''},unit=${unit},quantity=${quantity},price_per_unit=${price} WHERE id=${id}`;
+        return res.json({ success: true });
+      }
+      case 'editProduct': {
+        const { id, name, category, quantity, price } = params;
+        await sql`UPDATE products SET name=${name},category=${category},quantity=${quantity},price=${price} WHERE id=${id}`;
+        return res.json({ success: true });
+      }
+      case 'editHardwareItem': {
+        const { id, name, unit, quantity, price } = params;
+        await sql`UPDATE hardware SET name=${name},unit=${unit},quantity=${quantity},price_per_unit=${price} WHERE id=${id}`;
+        return res.json({ success: true });
+      }
+
       // ===== SALES =====
       case 'getSales': {
         const { rows } = await sql`SELECT * FROM sales ORDER BY id DESC`;
