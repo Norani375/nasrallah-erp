@@ -42,7 +42,7 @@ export const Sales: React.FC = () => {
     if (cart.find((c) => c.product_id === selectedProductId)) return;
     setCart([...cart, {
       product_id: product.id, product_name: product.name,
-      quantity: 1, unit_price: product.price, max_qty: product.quantity,
+      quantity: 1, unit_price: product.price || 0, max_qty: product.quantity,
     }]);
     setSelectedProductId(0);
   }
@@ -110,7 +110,7 @@ export const Sales: React.FC = () => {
   }
 
   const cartTotal = cart.reduce((s, c) => s + c.quantity * c.unit_price, 0);
-  const availableProducts = products.filter((p) => p.quantity > 0 && p.price > 0 && !cart.find((c) => c.product_id === p.id));
+  const availableProducts = products.filter((p) => p.quantity > 0 && (p.price ?? 0) > 0 && !cart.find((c) => c.product_id === p.id));
 
   if (loading) {
     return <div className="flex items-center justify-center h-64"><span className="loading loading-spinner loading-lg text-primary" /></div>;
